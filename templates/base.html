@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}黑盒漏洞巡检扫描器{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    {% block head %}{% endblock %}
+</head>
+<body>
+    <div class="layout">
+        <!-- 左侧导航栏 -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="sidebar-logo">
+                    <svg class="logo-q" viewBox="0 0 48 48" width="40" height="40" xmlns="http://www.w3.org/2000/svg">
+                        <circle cx="22" cy="22" r="20" fill="none" stroke="currentColor" stroke-width="4.5"/>
+                        <path d="M32 30 L50 50" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+                        <path d="M22 2 A20 20 0 0 0 3 24" fill="none" stroke="#a7f3d0" stroke-width="4.5" stroke-linecap="round" opacity=".7">
+                            <animateTransform attributeName="transform" type="rotate" from="0 22 22" to="360 22 22" dur="3s" repeatCount="indefinite"/>
+                        </path>
+                    </svg>
+                    <span class="logo-text">竹影扫描器</span>
+                </div>
+                <p class="sidebar-subtitle">黑盒漏洞巡检平台</p>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="{{ url_for('index') }}" class="nav-item {{ 'active' if request.endpoint == 'index' }}">
+                    <span class="nav-icon">&#9681;</span>
+                    <span>仪表盘</span>
+                </a>
+                <a href="{{ url_for('new_scan') }}" class="nav-item {{ 'active' if request.endpoint == 'new_scan' }}">
+                    <span class="nav-icon">&#10010;</span>
+                    <span>新建扫描</span>
+                </a>
+                <a href="{{ url_for('vulnerability_list') }}" class="nav-item {{ 'active' if request.endpoint == 'vulnerability_list' }}">
+                    <span class="nav-icon">&#9888;</span>
+                    <span>漏洞列表</span>
+                </a>
+                <a href="{{ url_for('plugin_list') }}" class="nav-item {{ 'active' if request.endpoint in ('plugin_list', 'plugin_editor') }}">
+                    <span class="nav-icon">&#9881;</span>
+                    <span>插件管理</span>
+                </a>
+            </nav>
+            <div class="sidebar-footer">
+                <div class="status-dot"></div>
+                <span>系统运行中</span>
+            </div>
+        </aside>
+
+        <!-- 右侧主内容区 -->
+        <main class="main-content">
+            <header class="topbar">
+                <h1 class="page-title">{% block page_title %}仪表盘{% endblock %}</h1>
+                <div class="topbar-actions">
+                    {% block topbar_actions %}{% endblock %}
+                </div>
+            </header>
+            <div class="content-body">
+                {% block content %}{% endblock %}
+            </div>
+        </main>
+    </div>
+    {% block scripts %}{% endblock %}
+</body>
+</html>

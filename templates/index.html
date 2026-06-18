@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}仪表盘 - BlackBox Scanner{% endblock %}
+{% block page_title %}仪表盘{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('new_scan') }}" class="btn btn-primary">+ 新建扫描任务</a>
+{% endblock %}
+
+{% block content %}
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-icon">&#9654;</div>
+        <div class="stat-number">{{ scans|length }}</div>
+        <div class="stat-label">扫描任务总数</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">&#9888;</div>
+        <div class="stat-number">{{ vuln_count }}</div>
+        <div class="stat-label">发现漏洞总数</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-icon">&#9881;</div>
+        <div class="stat-number">{{ plugin_count }}</div>
+        <div class="stat-label">自定义插件</div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="section-header">
+        <span class="section-title">最近扫描任务</span>
+    </div>
+
+    {% if scans %}
+    <table class="table" style="box-shadow: none;">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>目标</th>
+                <th>状态</th>
+                <th>创建时间</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for scan in scans %}
+            <tr>
+                <td><strong>{{ loop.index }}</strong></td>
+                <td>{{ scan.target }}</td>
+                <td><span class="status-badge status-{{ scan.status }}">{{ scan.status }}</span></td>
+                <td>{{ scan.created_at }}</td>
+                <td class="action-cell">
+                    <a href="{{ url_for('scan_detail', scan_id=scan.id) }}" class="btn-sm btn-sm-primary">详情</a>
+                    <button class="btn-sm btn-sm-danger" onclick="confirmDelete({{ scan.id }}, '{{ scan.target|e }}')">删除</button>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty-hint">暂无扫描任务，点击右上角按钮创建</p>
+    {% endif %}
+</div>
+
+<!-- 删除确认弹窗 -->
+<div class="modal-overlay" id="deleteModal" style="display:none;">
+    <div class="modal-dialog">
+        <div class="modal-icon-wrap">
+            <svg class="modal-warn-icon" viewBox="0 0 64 64" width="64" height="64">
+                <circle cx="32" cy="32" r="28" fill="none" stroke="#e74c3c" stroke-width="3">
+                    <animate attributeName="r" values="26;29;26" dur="1.5s" repeatCount="indefinite"/>
+                    <animate attributeName="opacity" values="0.6;1;0.6" dur="1.5s" repeatCount="indefinite"/>
+                </circle>
+                <line x1="32" y1="18" x2="32" y2="36" stroke="#e74c3c" stroke-width="3.5" stroke-linecap="round"/>
+                <circle cx="32" cy="44" r="2.5" fill="#e74c3c"/>
+            </svg>
+        </div>
+        <h3 class="modal-title">确认删除</h3>
+        <p class="modal-body">确定要删除扫描任务 <strong id="deleteTargetName"></strong> 吗？</p>
+        <p class="modal-hint">该操作会同时删除关联的所有漏洞数据，且不可恢复。</p>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeDeleteModal()">取消</button>
+            <button class="btn btn-danger" id="deleteConfirmBtn" onclick="doDelete()">
+                <span class="btn-text">确认删除</span>
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+var deleteScanId = null;
+
+function confirmDelete(scanId, target) {
+    deleteScanId = scanId;
+    document.getElementById('deleteTargetName').textContent = target;
+    var modal = document.getElementById('deleteModal');
+    modal.style.display = 'flex';
+    requestAnimationFrame(function() {
+        modal.classList.add('show');
+    });
+}
+
+function closeDeleteModal() {
+    var modal = document.getElementById('deleteModal');
+    modal.classList.remove('show');
+    setTimeout(function() {
+        modal.style.display = 'none';
+    }, 300);
+}
+
+function doDelete() {
+    var btn = document.getElementById('deleteConfirmBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-spinner"></span> 删除中...';
+
+    fetch('/api/scans/' + deleteScanId + '/delete', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                location.reload();
+            }
+        })
+        .catch(function() {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="btn-text">确认删除</span>';
+        });
+}
+
+document.getElementById('deleteModal').addEventListener('click', function(e) {
+    if (e.target === this) closeDeleteModal();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,326 @@
+{% extends "base.html" %}
+{% block title %}扫描详情 #{{ scan.id }} - BlackBox Scanner{% endblock %}
+{% block page_title %}扫描详情 #{{ scan.id }}{% endblock %}
+
+{% block topbar_actions %}
+<div class="topbar-actions-group">
+    <a href="{{ url_for('index') }}" class="btn btn-secondary">返回仪表盘</a>
+    <button class="btn btn-danger-outline" onclick="confirmDelete({{ scan.id }}, '{{ scan.target|e }}')">删除此任务</button>
+</div>
+{% endblock %}
+
+{% block content %}
+<!-- 扫描进度卡片 -->
+<div class="card bamboo-card">
+    <table class="info-table">
+        <tr><td class="label">目标</td><td><strong>{{ scan.target }}</strong></td></tr>
+        <tr><td class="label">创建时间</td><td>{{ scan.created_at }}</td></tr>
+        <tr><td class="label">更新时间</td><td>{{ scan.updated_at }}</td></tr>
+        {% if scan.status in ('nuclei_scanning','completed') and scan.get('open_ports') %}
+        <tr><td class="label">开放端口</td><td><span class="ports-badge">{{ scan.get('open_ports', '') }}</span></td></tr>
+        {% endif %}
+    </table>
+
+    <!-- 扫描步骤进度条 -->
+    <div class="scan-steps">
+        <div class="scan-step {{ 'done' if scan.status in ('nmap_scanning','nuclei_scanning','completed') else 'active' if scan.status == 'pending' else '' }}">
+            <span class="step-icon">
+                {% if scan.status == 'pending' %}<span class="step-spinner"></span>
+                {% else %}<span class="step-check"></span>{% endif %}
+            </span>
+            <span class="step-label">排队中</span>
+        </div>
+        <div class="scan-step {{ 'done' if scan.status in ('nuclei_scanning','completed') else 'active' if scan.status == 'nmap_scanning' else '' }}">
+            <span class="step-icon">
+                {% if scan.status == 'nmap_scanning' %}<span class="step-spinner"></span>
+                {% elif scan.status in ('nuclei_scanning','completed') %}<span class="step-check"></span>
+                {% else %}<span class="step-dot"></span>{% endif %}
+            </span>
+            <span class="step-label">Nmap 扫描</span>
+        </div>
+        <div class="scan-step {{ 'done' if scan.status == 'completed' else 'active' if scan.status == 'nuclei_scanning' else '' }}">
+            <span class="step-icon">
+                {% if scan.status == 'nuclei_scanning' %}<span class="step-spinner"></span>
+                {% elif scan.status == 'completed' %}<span class="step-check"></span>
+                {% else %}<span class="step-dot"></span>{% endif %}
+            </span>
+            <span class="step-label">Nuclei 扫描</span>
+        </div>
+        <div class="scan-step {{ 'done' if scan.status == 'completed' else '' }}">
+            <span class="step-icon">
+                {% if scan.status == 'completed' %}<span class="step-check"></span>
+                {% elif scan.status in ('nmap_scanning','nuclei_scanning','running') %}<span class="step-spinner"></span>
+                {% else %}<span class="step-dot"></span>{% endif %}
+            </span>
+            <span class="step-label">{{ '完成' if scan.status == 'completed' else '等待中' }}</span>
+        </div>
+    </div>
+
+    {% if scan.status == 'failed' %}
+    <div class="alert alert-error" style="margin-top: 16px;">扫描失败，请重试</div>
+    {% endif %}
+
+    {% if scan.status in ('pending', 'nmap_scanning', 'nuclei_scanning', 'running') %}
+    <!-- SVG 精美竹林 -->
+    <div class="bamboo-svg-wrap">
+        <svg viewBox="0 0 320 180" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#5d9a3f"/>
+                    <stop offset="45%" stop-color="#4a7c2e"/>
+                    <stop offset="100%" stop-color="#375e20"/>
+                </linearGradient>
+                <linearGradient id="bgl" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#7bc67e"/>
+                    <stop offset="50%" stop-color="#4d8a32"/>
+                    <stop offset="100%" stop-color="#3d6b28"/>
+                </linearGradient>
+                <linearGradient id="leafG" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0%" stop-color="#b8f0b0"/>
+                    <stop offset="60%" stop-color="#5da83a"/>
+                    <stop offset="100%" stop-color="#3d7a20"/>
+                </linearGradient>
+                <radialGradient id="glow" cx="50%" cy="80%" r="50%">
+                    <stop offset="0%" stop-color="rgba(100,180,80,.08)"/>
+                    <stop offset="100%" stop-color="transparent"/>
+                </radialGradient>
+            </defs>
+
+            <!-- 背景光晕 -->
+            <ellipse cx="160" cy="140" rx="160" ry="60" fill="url(#glow)"/>
+
+            <!-- 地面 -->
+            <ellipse cx="160" cy="172" rx="140" ry="6" fill="rgba(77,124,15,.07)"/>
+            <path d="M8 170 Q70 166 160 168 Q250 170 312 167" stroke="rgba(77,124,15,.18)" stroke-width="1.2" fill="none"/>
+            <path d="M20 173 Q90 170 160 171 Q230 172 300 170" stroke="rgba(90,140,30,.1)" stroke-width="1" fill="none"/>
+
+            <!-- === 左竿 (稍矮) === -->
+            <g class="bamboo-stalk-svg" style="transform-origin:70px 168px">
+                <!-- Segment 1 -->
+                <path d="M65 168 L65 148 Q65 145 67 143 L73 143 Q75 145 75 148 L75 168Z" fill="url(#bgl)" opacity=".92"/>
+                <ellipse cx="70" cy="148" rx="5.5" ry="1.8" fill="#3d6b28" opacity=".6"/>
+                <!-- Segment 2 -->
+                <path d="M68 148 L68 125 Q68 122 70 120 L70 120 Q72 122 72 125 L72 148Z" fill="url(#bgl)" opacity=".92"/>
+                <ellipse cx="70" cy="125" rx="2.5" ry="1.2" fill="#3d6b28" opacity=".5"/>
+                <!-- Segment 3 -->
+                <path d="M69 125 L69 108 Q69 106 70 105 L71 105 Q71 106 71 108 L71 125Z" fill="url(#bgl)" opacity=".9"/>
+                <!-- 竹叶 L1 -->
+                <path class="bamboo-leaf-svg" style="--leaf-origin:68px 125px" d="M70 125 Q45 118 28 126 Q48 130 70 125Z" fill="url(#leafG)" opacity=".9"/>
+                <path class="bamboo-leaf-svg" style="--leaf-origin:68px 125px" d="M70 125 Q55 110 42 108 Q58 116 70 125Z" fill="url(#leafG)" opacity=".85"/>
+            </g>
+
+            <!-- === 中竿 (最高) === -->
+            <g class="bamboo-stalk-svg" style="transform-origin:165px 170px">
+                <!-- Segment 1 (base, thickest) -->
+                <path d="M158 170 L158 138 Q158 134 162 132 L168 132 Q172 134 172 138 L172 170Z" fill="url(#bg)"/>
+                <!-- Node ring -->
+                <ellipse cx="165" cy="138" rx="8" ry="2.2" fill="#2d4a1a" opacity=".55"/>
+                <ellipse cx="165" cy="137" rx="7.5" ry="1.5" fill="#5d9a3f" opacity=".3"/>
+                <!-- Segment 2 -->
+                <path d="M160 138 L160 110 Q160 106 163 104 L167 104 Q170 106 170 110 L170 138Z" fill="url(#bg)"/>
+                <ellipse cx="165" cy="110" rx="6" ry="1.8" fill="#2d4a1a" opacity=".5"/>
+                <ellipse cx="165" cy="109" rx="5.5" ry="1.2" fill="#5d9a3f" opacity=".3"/>
+                <!-- Segment 3 -->
+                <path d="M161.5 110 L161.5 85 Q161.5 82 163.5 80 L166.5 80 Q168.5 82 168.5 85 L168.5 110Z" fill="url(#bg)"/>
+                <ellipse cx="165" cy="85" rx="4.5" ry="1.5" fill="#2d4a1a" opacity=".5"/>
+                <ellipse cx="165" cy="84" rx="4" ry="1" fill="#5d9a3f" opacity=".3"/>
+                <!-- Segment 4 (top) -->
+                <path d="M163 85 L163 67 Q163 65 164.5 64 L165.5 64 Q167 65 167 67 L167 85Z" fill="url(#bg)" opacity=".95"/>
+                <!-- 竹叶 L2 (中竿 上部) -->
+                <path class="bamboo-leaf-svg" style="--leaf-origin:165px 85px" d="M165 85 Q182 68 195 62 Q180 78 165 85Z" fill="url(#leafG)" opacity=".9"/>
+                <path class="bamboo-leaf-svg" style="--leaf-origin:165px 85px" d="M165 85 Q175 72 188 73 Q178 80 165 85Z" fill="url(#leafG)" opacity=".7"/>
+                <!-- 竹叶 L2 (中竿 中部) -->
+                <path class="bamboo-leaf-svg" style="--leaf-origin:161px 110px" d="M164 110 Q140 95 125 90 Q142 104 164 110Z" fill="url(#leafG)" opacity=".85"/>
+                <path class="bamboo-leaf-svg" style="--leaf-origin:161px 110px" d="M164 110 Q148 92 135 86 Q150 100 164 110Z" fill="url(#leafG)" opacity=".7"/>
+            </g>
+
+            <!-- === 右竿 (中等) === -->
+            <g class="bamboo-stalk-svg" style="transform-origin:250px 169px">
+                <!-- Segment 1 -->
+                <path d="M245 169 L245 144 Q245 141 248 139 L252 139 Q255 141 255 144 L255 169Z" fill="url(#bgl)" opacity=".92"/>
+                <ellipse cx="250" cy="144" rx="6" ry="2" fill="#3d6b28" opacity=".55"/>
+                <!-- Segment 2 -->
+                <path d="M246.5 144 L246.5 116 Q246.5 113 249 111 L251 111 Q253.5 113 253.5 116 L253.5 144Z" fill="url(#bgl)" opacity=".92"/>
+                <ellipse cx="250" cy="116" rx="3.5" ry="1.5" fill="#3d6b28" opacity=".5"/>
+                <!-- Segment 3 -->
+                <path d="M248 116 L248 98 Q248 96 249.5 95 L250.5 95 Q252 96 252 98 L252 116Z" fill="url(#bgl)" opacity=".9"/>
+                <!-- 竹叶 R1 -->
+                <path class="bamboo-leaf-svg" style="--leaf-origin:252px 116px" d="M250 116 Q275 102 291 105 Q273 112 250 116Z" fill="url(#leafG)" opacity=".85"/>
+                <path class="bamboo-leaf-svg" style="--leaf-origin:252px 116px" d="M250 116 Q264 100 275 96 Q262 108 250 116Z" fill="url(#leafG)" opacity=".65"/>
+                <!-- 竹叶 R2 (低部) -->
+                <path class="bamboo-leaf-svg" style="--leaf-origin:253px 144px" d="M250 144 Q272 132 285 128 Q270 140 250 144Z" fill="url(#leafG)" opacity=".8"/>
+            </g>
+
+            <!-- 小竹笋 -->
+            <g style="transform-origin:130px 172px; animation: stalkGrow .7s ease-out .5s both;">
+                <path d="M128 172 L130 153 Q130 151 131 150 L131 150 Q132 151 132 153 L132 172Z" fill="#5d9a3f" opacity=".7"/>
+                <ellipse cx="130" cy="153" rx="2" ry="1" fill="#3d6b28" opacity=".4"/>
+                <path class="bamboo-leaf-svg" style="--leaf-origin:130px 158px" d="M131 158 Q118 148 112 145 Q122 152 131 158Z" fill="#7bc67e" opacity=".65"/>
+            </g>
+
+            <!-- 飘落竹叶 -->
+            <path d="M260 50 Q268 45 275 48 Q268 52 260 50Z" fill="#7bc67e" opacity=".35">
+                <animateTransform attributeName="transform" type="translate" values="0,0; -6,20; -2,40; 4,62; 0,78" dur="6s" repeatCount="indefinite"/>
+                <animate attributeName="opacity" values="0;.4;.35;.25;0" dur="6s" repeatCount="indefinite"/>
+            </path>
+        </svg>
+    </div>
+    <p style="text-align: center; color: var(--primary); font-size: 14px; margin-top: 4px;">
+        <span id="status-poll-text">扫描进行中，竹子正在生长...</span>
+    </p>
+    {% endif %}
+</div>
+
+{% if scan.nmap_output %}
+<div class="card" style="margin-top: 20px;">
+    <div class="section-header">
+        <span class="section-title">Nmap 扫描结果</span>
+    </div>
+    <pre class="output-box">{{ scan.nmap_output }}</pre>
+</div>
+{% endif %}
+
+{% if scan.nuclei_output %}
+<div class="card" style="margin-top: 20px;">
+    <div class="section-header">
+        <span class="section-title">Nuclei 扫描结果</span>
+    </div>
+    <pre class="output-box">{{ scan.nuclei_output }}</pre>
+</div>
+{% endif %}
+
+<div class="card" style="margin-top: 20px;">
+    <div class="section-header">
+        <span class="section-title">发现的漏洞 ({{ vulns|length }})</span>
+    </div>
+
+    {% if vulns %}
+    <table class="table" style="box-shadow: none; border: none;">
+        <thead>
+            <tr>
+                <th>漏洞名称</th>
+                <th>严重程度</th>
+                <th>IP</th>
+                <th>时间</th>
+                <th>操作</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for v in vulns %}
+            <tr>
+                <td>{{ v.template_name }}</td>
+                <td><span class="severity severity-{{ v.severity|lower }}">{{ v.severity }}</span></td>
+                <td>{{ v.ip }}</td>
+                <td>{{ v.created_at }}</td>
+                <td><a href="{{ url_for('vulnerability_detail', vuln_id=v.id) }}">详情</a></td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty-hint">
+        {% if scan.status == 'completed' %}
+            <span class="step-check" style="margin-right:6px;vertical-align:middle;"></span>未发现漏洞，竹子安然无恙
+        {% else %}
+            等待扫描完成...
+        {% endif %}
+    </p>
+    {% endif %}
+</div>
+
+<!-- 删除确认弹窗 -->
+<div class="modal-overlay" id="deleteModal" style="display:none;">
+    <div class="modal-dialog">
+        <div class="modal-icon-wrap">
+            <svg class="modal-warn-icon" viewBox="0 0 64 64" width="64" height="64">
+                <circle cx="32" cy="32" r="28" fill="none" stroke="#e74c3c" stroke-width="3">
+                    <animate attributeName="r" values="26;29;26" dur="1.5s" repeatCount="indefinite"/>
+                    <animate attributeName="opacity" values="0.6;1;0.6" dur="1.5s" repeatCount="indefinite"/>
+                </circle>
+                <line x1="32" y1="18" x2="32" y2="36" stroke="#e74c3c" stroke-width="3.5" stroke-linecap="round"/>
+                <circle cx="32" cy="44" r="2.5" fill="#e74c3c"/>
+            </svg>
+        </div>
+        <h3 class="modal-title">确认删除</h3>
+        <p class="modal-body">确定要删除扫描任务 <strong id="deleteTargetName"></strong> 吗？</p>
+        <p class="modal-hint">该操作会同时删除关联的所有漏洞数据，且不可恢复。</p>
+        <div class="modal-actions">
+            <button class="btn btn-secondary" onclick="closeDeleteModal()">取消</button>
+            <button class="btn btn-danger" id="deleteConfirmBtn" onclick="doDelete()">
+                <span class="btn-text">确认删除</span>
+            </button>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if scan.status in ('nmap_scanning', 'nuclei_scanning', 'running', 'pending') %}
+<script>
+(function poll() {
+    fetch("{{ url_for('api_scan_status', scan_id=scan.id) }}")
+        .then(r => r.json())
+        .then(data => {
+            var el = document.getElementById('status-poll-text');
+            if (data.status === 'nmap_scanning') {
+                el.innerText = 'Nmap 端口扫描中，竹子正在拔节...';
+            } else if (data.status === 'nuclei_scanning') {
+                el.innerText = 'Nuclei 漏洞扫描中，竹叶正在舒展...';
+            } else if (data.status === 'pending') {
+                el.innerText = '排队中，竹笋即将破土...';
+            }
+            if (data.status !== 'completed' && data.status !== 'failed') {
+                setTimeout(poll, 3000);
+            } else {
+                location.reload();
+            }
+        })
+        .catch(function() { setTimeout(poll, 5000); });
+})();
+</script>
+{% endif %}
+
+<script>
+var deleteScanId = null;
+
+function confirmDelete(scanId, target) {
+    deleteScanId = scanId;
+    document.getElementById('deleteTargetName').textContent = target;
+    var modal = document.getElementById('deleteModal');
+    modal.style.display = 'flex';
+    requestAnimationFrame(function() {
+        modal.classList.add('show');
+    });
+}
+
+function closeDeleteModal() {
+    var modal = document.getElementById('deleteModal');
+    modal.classList.remove('show');
+    setTimeout(function() {
+        modal.style.display = 'none';
+    }, 300);
+}
+
+function doDelete() {
+    var btn = document.getElementById('deleteConfirmBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="btn-spinner"></span> 删除中...';
+
+    fetch('/api/scans/' + deleteScanId + '/delete', { method: 'POST' })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+            if (data.ok) {
+                window.location.href = '{{ url_for("index") }}';
+            }
+        })
+        .catch(function() {
+            btn.disabled = false;
+            btn.innerHTML = '<span class="btn-text">确认删除</span>';
+        });
+}
+
+document.getElementById('deleteModal').addEventListener('click', function(e) {
+    if (e.target === this) closeDeleteModal();
+});
+</script>
+{% endblock %}

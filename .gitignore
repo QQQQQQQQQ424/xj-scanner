@@ -1,0 +1,30 @@
+# 数据库文件
+data/
+*.db
+*.sqlite3
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
+.venv/
+
+# 工具二进制（太大，用 download_tools 脚本自行下载）
+tool/nmap/
+tool/nuclei/
+tool/nuclei-templates/
+
+# 自定义插件目录（保留目录结构，内容由用户自行管理）
+plugins/*.yaml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

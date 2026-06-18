@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}插件管理 - BlackBox Scanner{% endblock %}
+{% block page_title %}插件管理{% endblock %}
+
+{% block topbar_actions %}
+<a href="{{ url_for('plugin_editor') }}" class="btn btn-primary">+ 新建插件</a>
+{% endblock %}
+
+{% block content %}
+{% if plugins %}
+<table class="table">
+    <thead>
+        <tr>
+            <th>插件名称</th>
+            <th>描述</th>
+            <th>更新时间</th>
+            <th>操作</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for p in plugins %}
+        <tr>
+            <td><strong>{{ p.name }}</strong></td>
+            <td>{{ p.description or '-' }}</td>
+            <td>{{ p.updated_at }}</td>
+            <td>
+                <a href="{{ url_for('plugin_editor', plugin_id=p.id) }}" class="btn btn-secondary btn-sm">编辑</a>
+                <a href="#" onclick="deletePlugin({{ p.id }})" class="btn btn-danger btn-sm" style="margin-left: 4px;">删除</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p class="empty-hint">暂无自定义插件，点击右上角按钮创建</p>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+function deletePlugin(id) {
+    if (!confirm('确定要删除该插件吗？')) return;
+    fetch('/api/plugins/' + id + '/delete', { method: 'POST' })
+        .then(r => r.json())
+        .then(data => {
+            if (data.ok) location.reload();
+        });
+}
+</script>
+{% endblock %}

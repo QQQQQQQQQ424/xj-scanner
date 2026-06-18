@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}{% if plugin %}编辑插件{% else %}新建插件{% endif %} - BlackBox Scanner{% endblock %}
+{% block page_title %}{% if plugin %}编辑插件{% else %}新建插件{% endif %}{% endblock %}
+
+{% block content %}
+<div class="card">
+    {% if error %}
+    <div class="alert alert-error">{{ error }}</div>
+    {% endif %}
+
+    <form method="POST">
+        <div class="form-group">
+            <label>插件名称 (不含 .yaml 后缀)</label>
+            <input type="text" name="name"
+                   placeholder="例如: detect-nginx-status"
+                   value="{{ plugin.name if plugin else request.form.get('name', '') }}" required>
+            <small>插件名将作为文件名保存，扫描时自动加载</small>
+        </div>
+
+        <div class="form-group">
+            <label>描述 (可选)</label>
+            <input type="text" name="description"
+                   placeholder="简短描述该插件的用途"
+                   value="{{ plugin.description if plugin else request.form.get('description', '') }}">
+        </div>
+
+        <div class="form-group">
+            <label>插件内容 (YAML 格式)</label>
+            <textarea name="content" rows="20" required
+                      placeholder="在此编写 Nuclei 模板...">{{ plugin.content if plugin else request.form.get('content', '') }}</textarea>
+            <small>请按照 Nuclei YAML 模板规范编写。扫描时将自动同步到插件目录并加载使用。</small>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn btn-primary">保存插件</button>
+            <a href="{{ url_for('plugin_list') }}" class="btn btn-secondary">取消</a>
+        </div>
+    </form>
+</div>
+{% endblock %}
