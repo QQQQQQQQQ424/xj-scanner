@@ -1,12 +1,12 @@
 # BlackBox Scanner - 黑盒漏洞巡检扫描器
 
-基于 Nmap + Nuclei 的自动化漏洞巡检系统，提供 Web 管理界面，支持自定义 Nuclei 插件。
+基于 Nmap + Dirsearch + Nuclei 的自动化漏洞巡检系统，提供 Web 管理界面，支持自定义 Nuclei 插件。
 
 ## 系统要求
 
 - **操作系统**: Linux x86_64 / Windows 10+ x64
 - **Python**: 3.8+
-- **依赖工具**: nmap, nuclei, git（可通过脚本自动下载）
+- **依赖工具**: nmap, nuclei, dirsearch, git（可通过脚本自动下载）
 
 ---
 
@@ -166,7 +166,7 @@ python app.py
 | SQLite | `data/scanner.db` | AUTOINCREMENT | TEXT |
 | MySQL | `blackbox_scanner` | AUTO_INCREMENT | MEDIUMTEXT |
 
-三种表：`scans`、`vulnerabilities`、`nuclei_plugins`，两种模式结构一致，接口完全兼容。
+四种表：`scans`、`vulnerabilities`、`nuclei_plugins`，两种模式结构一致，接口完全兼容。
 
 > **注意**: MySQL 模式下不会生成 `data/scanner.db` 文件，所有数据直接写入 MySQL。
 
@@ -177,14 +177,26 @@ python app.py
 ### 仪表盘
 展示扫描任务数、发现漏洞数、自定义插件数等概览信息。
 
+### 扫描类型
+
+| 类型 | 流程 | 适用场景 |
+|------|------|----------|
+| `完整扫描` | Nmap → Dirsearch → Nuclei | IP/域名输入，全流程 |
+| `目录扫描` | Nmap → Dirsearch | 仅目录枚举 |
+| `仅端口扫描` | Nmap | 快速端口发现 |
+| `仅目录扫描` | Dirsearch | URL 输入，目录扫描 |
+
+> **输入模式**：输入纯 IP/域名 → Nmap 端口发现 → 构造 `http(s)://IP:PORT` → Dirsearch/Nuclei；输入 `http://IP:PORT` 格式 → 跳过 Nmap，直接 Dirsearch + Nuclei。
+
 ### 扫描管理
-- **新建扫描**: 输入目标 IP 或域名，选择扫描类型
-- **扫描流程**: 提交任务 → Nmap 端口/服务扫描 → Nuclei 漏洞扫描
-- **扫描详情**: 查看 Nmap & Nuclei 原始输出、发现的漏洞列表
+- **新建扫描**: 输入目标 IP/域名/URL，选择扫描类型
+- **批量上传**: 上传 `.txt` 文件（每行一个目标），弹窗编辑确认后批量扫描
+- **批量操作**: 全选扫描历史，支持批量取消排队、批量删除
+- **扫描详情**: 实时展示扫描步骤（Nmap → Dirsearch → Nuclei），显示各阶段输出
 - **后台队列**: 支持多任务排队扫描
 
 ### 漏洞管理
-- **漏洞列表**: 全局查看所有已发现的漏洞
+- **漏洞列表**: 按 IP 分组展示，点击 IP 行展开/收起该目标下所有漏洞
 - **漏洞详情**: 查看漏洞名称、严重程度、目标 IP、请求/响应包、cURL 复现命令
 
 ### 插件管理
@@ -201,9 +213,10 @@ blackbox-scanner/
 ├── app.py                 # Flask 主程序
 ├── config.py              # 配置文件 (路径/端口/数据库)
 ├── database.py            # 数据库操作 (SQLite / MySQL 双后端)
-├── scanner.py             # 扫描引擎 (Nmap + Nuclei)
-├── requirements.txt       # Python 依赖 (flask + pymysql)
+├── scanner.py             # 扫描引擎 (Nmap + Dirsearch + Nuclei)
+├── requirements.txt       # Python 依赖 (flask + pymysql + dirsearch + setuptools)
 ├── README.md              # 本文件
+├── .gitignore             # Git 忽略规则
 ├── tool/                  # 扫描工具目录
 │   ├── download_tools.sh  # 一键下载脚本 (Linux)
 │   ├── download_tools.ps1 # 一键下载脚本 (Windows)
@@ -213,7 +226,13 @@ blackbox-scanner/
 ├── plugins/               # 用户自定义插件 (YAML)
 ├── data/                  # SQLite 数据库 (sqlite 模式)
 ├── templates/             # Web 页面模板
-└── static/                # CSS 静态资源
+│   ├── base.html          # 基础布局 (侧边栏 + 竹叶导航)
+│   ├── index.html         # 仪表盘 + 扫描历史
+│   ├── new_scan.html      # 新建扫描任务
+│   ├── scan_detail.html   # 扫描详情 (竹子生长动画)
+│   ├── vulnerability_list.html  # 漏洞总览 (IP 分组)
+│   └── vulnerability_detail.html # 漏洞详情
+└── static/                # CSS/JS 静态资源
 ```
 
 ---
@@ -246,8 +265,25 @@ requests:
 
 ## 注意事项
 
-1. 确保扫描工具（nmap、nuclei）有执行权限
+1. 确保扫描工具（nmap、nuclei、dirsearch）有执行权限
 2. 部分扫描操作可能需要 root 权限（如 SYN 扫描）
 3. 请遵守法律法规，仅对授权目标进行扫描
 4. SQLite 模式下数据库文件位于 `data/scanner.db`，建议定期备份
 5. 从 SQLite 迁移到 MySQL：导出 SQLite 数据 → 导入 MySQL → 设置 `DB_TYPE=mysql` 启动即可，表名和字段完全一致
+6. **dirsearch 模块**: 需要 `setuptools<68`（新版移除 pkg_resources，可运行 `pip install 'setuptools<68'`）
+
+---
+
+## 更新日志
+
+### v1.1
+- 新增 Dirsearch 目录扫描模块
+- 新增 4 种扫描类型（full / dirsearch_nmap / nmap / dirsearch）
+- Nmap 后自动筛选 HTTP 端口执行 Dirsearch
+- Dirsearch 输出仅保留有效发现（过滤 404、进度信息）
+- URL 输入模式跳过 Nmap 但不跳过 Dirsearch
+- 漏洞列表按 IP 分组，点击展开
+- 批量上传 .txt 文件扫描
+- 全选 + 批量取消排队 + 批量删除
+- 修复文件上传幽灵点击 & 弹窗打开两次问题
+- 新增 `.gitignore` 防止敏感文件泄露
