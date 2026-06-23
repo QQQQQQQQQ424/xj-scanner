@@ -37,6 +37,7 @@ def _find_tool(name):
 
 NMAP_PATH = _find_tool('nmap')
 NUCLEI_PATH = _find_tool('nuclei')
+DIRSEARCH_PATH = shutil.which('dirsearch') or shutil.which('dirsearch.exe') or 'dirsearch'
 
 # ========== 数据库配置 ==========
 # 设为 'sqlite' 或 'mysql'

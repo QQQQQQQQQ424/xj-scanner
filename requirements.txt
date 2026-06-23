@@ -1,2 +1,4 @@
 flask>=2.3.0
 pymysql>=1.1.0
+dirsearch>=0.4.3
+setuptools<68

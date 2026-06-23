@@ -20,8 +20,14 @@
         <div class="form-group">
             <label>扫描类型</label>
             <select name="scan_type">
-                <option value="full">完整扫描 (Nmap + Nuclei)</option>
-                <option value="quick">快速扫描 (仅 Nuclei)</option>
+                <optgroup label="完整流程">
+                    <option value="full">完整扫描 (Nmap + Dirsearch + Nuclei)</option>
+                    <option value="dirsearch_nmap">目录扫描 (Nmap + Dirsearch)</option>
+                </optgroup>
+                <optgroup label="单项扫描">
+                    <option value="nmap">仅端口扫描 (Nmap)</option>
+                    <option value="dirsearch">仅目录扫描 (Dirsearch)</option>
+                </optgroup>
             </select>
         </div>
 

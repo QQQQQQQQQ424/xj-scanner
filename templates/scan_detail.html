@@ -33,10 +33,18 @@
         <div class="scan-step {{ 'done' if scan.status in ('nuclei_scanning','completed') else 'active' if scan.status == 'nmap_scanning' else '' }}">
             <span class="step-icon">
                 {% if scan.status == 'nmap_scanning' %}<span class="step-spinner"></span>
-                {% elif scan.status in ('nuclei_scanning','completed') %}<span class="step-check"></span>
+                {% elif scan.status in ('nuclei_scanning','completed','dirsearch_scanning') %}<span class="step-check"></span>
                 {% else %}<span class="step-dot"></span>{% endif %}
             </span>
             <span class="step-label">Nmap 扫描</span>
+        </div>
+        <div class="scan-step {{ 'done' if scan.status in ('nuclei_scanning','completed') else 'active' if scan.status == 'dirsearch_scanning' else '' }}">
+            <span class="step-icon">
+                {% if scan.status == 'dirsearch_scanning' %}<span class="step-spinner"></span>
+                {% elif scan.status in ('nuclei_scanning','completed') %}<span class="step-check"></span>
+                {% else %}<span class="step-dot"></span>{% endif %}
+            </span>
+            <span class="step-label">Dirsearch</span>
         </div>
         <div class="scan-step {{ 'done' if scan.status == 'completed' else 'active' if scan.status == 'nuclei_scanning' else '' }}">
             <span class="step-icon">
@@ -180,6 +188,15 @@
 </div>
 {% endif %}
 
+{% if scan.get('dirsearch_output') and '跳过' not in scan.get('dirsearch_output', '') %}
+<div class="card" style="margin-top: 20px;">
+    <div class="section-header">
+        <span class="section-title">Dirsearch 目录扫描结果</span>
+    </div>
+    <pre class="output-box">{{ scan.dirsearch_output }}</pre>
+</div>
+{% endif %}
+
 {% if scan.nuclei_output %}
 <div class="card" style="margin-top: 20px;">
     <div class="section-header">
@@ -195,28 +212,31 @@
     </div>
 
     {% if vulns %}
-    <table class="table" style="box-shadow: none; border: none;">
-        <thead>
-            <tr>
-                <th>漏洞名称</th>
-                <th>严重程度</th>
-                <th>IP</th>
-                <th>时间</th>
-                <th>操作</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for v in vulns %}
-            <tr>
-                <td>{{ v.template_name }}</td>
-                <td><span class="severity severity-{{ v.severity|lower }}">{{ v.severity }}</span></td>
-                <td>{{ v.ip }}</td>
-                <td>{{ v.created_at }}</td>
-                <td><a href="{{ url_for('vulnerability_detail', vuln_id=v.id) }}">详情</a></td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <div class="vuln-groups">
+        {% for ip, group_vulns in vuln_groups.items() %}
+        <div class="vuln-group">
+            <div class="vuln-group-header" onclick="toggleVulnGroup(this)">
+                <span class="vuln-group-arrow">&#9654;</span>
+                <span class="vuln-group-ip">{{ ip }}</span>
+                <span class="vuln-group-badge">{{ group_vulns|length }} 个漏洞</span>
+            </div>
+            <div class="vuln-group-body" style="display:none;">
+                {% for v in group_vulns %}
+                <div class="vuln-group-row">
+                    <div class="vuln-group-row-left">
+                        <span class="severity severity-{{ v.severity|lower }}">{{ v.severity }}</span>
+                        <span class="vuln-group-name">{{ v.template_name }}</span>
+                    </div>
+                    <div class="vuln-group-row-right">
+                        <span class="vuln-group-time">{{ v.created_at }}</span>
+                        <a href="{{ url_for('vulnerability_detail', vuln_id=v.id) }}" class="vuln-group-link">详情</a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
     {% else %}
     <p class="empty-hint">
         {% if scan.status == 'completed' %}
@@ -227,6 +247,20 @@
     </p>
     {% endif %}
 </div>
+
+<script>
+function toggleVulnGroup(header) {
+    var body = header.nextElementSibling;
+    var arrow = header.querySelector('.vuln-group-arrow');
+    if (body.style.display === 'none') {
+        body.style.display = 'block';
+        arrow.textContent = '▼';
+    } else {
+        body.style.display = 'none';
+        arrow.textContent = '▶';
+    }
+}
+</script>
 
 <!-- 删除确认弹窗 -->
 <div class="modal-overlay" id="deleteModal" style="display:none;">
@@ -255,7 +289,7 @@
 {% endblock %}
 
 {% block scripts %}
-{% if scan.status in ('nmap_scanning', 'nuclei_scanning', 'running', 'pending') %}
+{% if scan.status in ('nmap_scanning', 'nuclei_scanning', 'dirsearch_scanning', 'running', 'pending') %}
 <script>
 (function poll() {
     fetch("{{ url_for('api_scan_status', scan_id=scan.id) }}")
@@ -264,6 +298,8 @@
             var el = document.getElementById('status-poll-text');
             if (data.status === 'nmap_scanning') {
                 el.innerText = 'Nmap 端口扫描中，竹子正在拔节...';
+            } else if (data.status === 'dirsearch_scanning') {
+                el.innerText = 'Dirsearch 目录扫描中，竹笋正在萌发...';
             } else if (data.status === 'nuclei_scanning') {
                 el.innerText = 'Nuclei 漏洞扫描中，竹叶正在舒展...';
             } else if (data.status === 'pending') {

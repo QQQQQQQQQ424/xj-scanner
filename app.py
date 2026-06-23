@@ -5,11 +5,12 @@ from flask import (Flask, jsonify, redirect, render_template, request,
                    send_from_directory, url_for)
 
 import config
-from database import (delete_plugin, delete_scan, get_all_plugins, get_all_scans,
+from database import (batch_cancel_scans, batch_delete_scans, delete_plugin, delete_scan,
+                       get_all_plugins, get_all_scans,
                        get_all_vulnerabilities, get_plugin, get_scan,
                        get_vulnerabilities_by_scan, get_vulnerability,
                        init_db, save_plugin)
-from scanner import start_worker, submit_scan
+from scanner import batch_submit_scan, start_worker, submit_scan, remove_from_queue
 
 app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False
@@ -46,13 +47,23 @@ def scan_detail(scan_id):
     if not scan:
         return "扫描记录不存在", 404
     vulns = get_vulnerabilities_by_scan(scan_id)
-    return render_template('scan_detail.html', scan=scan, vulns=vulns)
+    # 按 IP 分组
+    vuln_groups = {}
+    for v in vulns:
+        key = v.get('ip') or '(未知)'
+        vuln_groups.setdefault(key, []).append(v)
+    return render_template('scan_detail.html', scan=scan, vulns=vulns, vuln_groups=vuln_groups)
 
 
 @app.route('/vulnerabilities')
 def vulnerability_list():
     vulns = get_all_vulnerabilities()
-    return render_template('vulnerability_list.html', vulns=vulns)
+    # 按 IP 分组
+    vuln_groups = {}
+    for v in vulns:
+        key = v.get('ip') or '(未知)'
+        vuln_groups.setdefault(key, []).append(v)
+    return render_template('vulnerability_list.html', vulns=vulns, vuln_groups=vuln_groups)
 
 
 @app.route('/vulnerabilities/<int:vuln_id>')
@@ -107,6 +118,67 @@ def api_delete_scan(scan_id):
     return jsonify({'ok': True})
 
 
+# ==== 批量上传 ====
+
+@app.route('/api/scans/batch-upload', methods=['POST'])
+def api_batch_upload():
+    """上传 .txt 文件，解析 IP/域名列表返回"""
+    if 'file' not in request.files:
+        return jsonify({'error': '未选择文件'}), 400
+    f = request.files['file']
+    if f.filename == '' or not f.filename.endswith('.txt'):
+        return jsonify({'error': '仅支持 .txt 文件'}), 400
+    try:
+        content = f.read().decode('utf-8', errors='replace')
+    except Exception:
+        return jsonify({'error': '文件读取失败'}), 400
+    # 按换行分割，过滤空行和注释
+    targets = []
+    for line in content.split('\n'):
+        line = line.strip()
+        if line and not line.startswith('#'):
+            targets.append(line)
+    if not targets:
+        return jsonify({'error': '文件中没有有效的目标'}), 400
+    return jsonify({'targets': targets, 'count': len(targets)})
+
+
+@app.route('/api/scans/batch-submit', methods=['POST'])
+def api_batch_submit():
+    """批量提交扫描任务"""
+    data = request.get_json(force=True)
+    targets = data.get('targets', [])
+    if not targets:
+        return jsonify({'error': '目标列表为空'}), 400
+    scan_ids = batch_submit_scan(targets)
+    return jsonify({'ok': True, 'count': len(scan_ids), 'scan_ids': scan_ids})
+
+
+@app.route('/api/scans/batch-cancel', methods=['POST'])
+def api_batch_cancel():
+    """批量取消等待中的扫描"""
+    data = request.get_json(force=True)
+    ids = data.get('ids', [])
+    ids = [int(i) for i in ids]
+    # 从队列移除
+    remove_from_queue(ids)
+    # 标记为 cancelled
+    count = batch_cancel_scans(ids)
+    return jsonify({'ok': True, 'count': count})
+
+
+@app.route('/api/scans/batch-delete', methods=['POST'])
+def api_batch_delete():
+    """批量删除扫描任务"""
+    data = request.get_json(force=True)
+    ids = data.get('ids', [])
+    ids = [int(i) for i in ids]
+    batch_delete_scans(ids)
+    # 也从队列移除
+    remove_from_queue(ids)
+    return jsonify({'ok': True, 'count': len(ids)})
+
+
 # ==== API 路由 ====
 
 @app.route('/api/scans/<int:scan_id>/status')
@@ -137,6 +209,14 @@ def api_nuclei_output(scan_id):
     if not scan:
         return jsonify({'error': 'not found'}), 404
     return jsonify({'output': scan.get('nuclei_output', '')})
+
+
+@app.route('/api/scans/<int:scan_id>/dirsearch_output')
+def api_dirsearch_output(scan_id):
+    scan = get_scan(scan_id)
+    if not scan:
+        return jsonify({'error': 'not found'}), 404
+    return jsonify({'output': scan.get('dirsearch_output', '')})
 
 
 # ==== 启动 ====

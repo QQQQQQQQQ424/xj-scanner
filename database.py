@@ -51,6 +51,7 @@ def init_db():
                 status VARCHAR(50) NOT NULL DEFAULT 'pending',
                 nmap_output MEDIUMTEXT,
                 nuclei_output MEDIUMTEXT,
+                dirsearch_output MEDIUMTEXT,
                 open_ports VARCHAR(500) DEFAULT '',
                 created_at DATETIME NOT NULL,
                 updated_at DATETIME NOT NULL
@@ -97,6 +98,7 @@ def init_db():
                 status TEXT NOT NULL DEFAULT 'pending',
                 nmap_output TEXT,
                 nuclei_output TEXT,
+                dirsearch_output TEXT,
                 open_ports TEXT DEFAULT '',
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
@@ -140,6 +142,11 @@ def init_db():
         cur.execute(f'ALTER TABLE scans ADD COLUMN open_ports VARCHAR(500) DEFAULT \'\'')
     except Exception:
         pass
+    # 为已有数据库添加 dirsearch_output 列（迁移）
+    try:
+        cur.execute(f'ALTER TABLE scans ADD COLUMN dirsearch_output MEDIUMTEXT')
+    except Exception:
+        pass
 
     conn.commit()
     conn.close()
@@ -159,7 +166,7 @@ def create_scan(target, scan_type='full'):
     return scan_id
 
 
-def update_scan_status(scan_id, status, nmap_output=None, nuclei_output=None, open_ports=None):
+def update_scan_status(scan_id, status, nmap_output=None, nuclei_output=None, open_ports=None, dirsearch_output=None):
     conn = _conn()
     cur = conn.cursor()
     now = time.strftime('%Y-%m-%d %H:%M:%S')
@@ -174,6 +181,9 @@ def update_scan_status(scan_id, status, nmap_output=None, nuclei_output=None, op
     if open_ports is not None:
         fields.append('open_ports = ' + _ph)
         values.append(open_ports)
+    if dirsearch_output is not None:
+        fields.append('dirsearch_output = ' + _ph)
+        values.append(dirsearch_output)
     values.append(scan_id)
     cur.execute(f'UPDATE scans SET {", ".join(fields)} WHERE id = {_ph}', values)
     conn.commit()
@@ -282,6 +292,38 @@ def delete_scan(scan_id):
     cur.execute(f'DELETE FROM scans WHERE id = {_ph}', (scan_id,))
     conn.commit()
     conn.close()
+
+
+def batch_delete_scans(scan_ids):
+    """批量删除扫描任务"""
+    if not scan_ids:
+        return
+    conn = _conn()
+    cur = conn.cursor()
+    ph_list = ','.join([_ph] * len(scan_ids))
+    cur.execute(f'DELETE FROM vulnerabilities WHERE scan_id IN ({ph_list})', scan_ids)
+    cur.execute(f'DELETE FROM scans WHERE id IN ({ph_list})', scan_ids)
+    conn.commit()
+    conn.close()
+
+
+def batch_cancel_scans(scan_ids):
+    """批量取消等待/排队中的扫描任务"""
+    if not scan_ids:
+        return 0
+    conn = _conn()
+    cur = conn.cursor()
+    now = time.strftime('%Y-%m-%d %H:%M:%S')
+    ph_list = ','.join([_ph] * len(scan_ids))
+    # 只取消 pending 状态的任务
+    cur.execute(
+        f"UPDATE scans SET status = 'cancelled', updated_at = {_ph} WHERE id IN ({ph_list}) AND status = 'pending'",
+        [now] + list(scan_ids)
+    )
+    affected = cur.rowcount
+    conn.commit()
+    conn.close()
+    return affected
 
 
 def get_all_plugins():
